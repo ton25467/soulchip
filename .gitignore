@@ -1,0 +1,23 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Service accounts & local keys
+service_account.json
+
+# IDE / Tool files
+.agents/
+.gemini/
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Deployment and push scripts containing tokens
+report/create_and_push_repo.py
