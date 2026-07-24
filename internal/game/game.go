@@ -162,8 +162,43 @@ func (g *Game) Update() error {
 		}
 
 		// โหมด Menu Pause
+		mx, my := ebiten.CursorPosition()
+		mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+
 		if g.settingsOpen {
-			// ควบคุมเมนูตั้งค่า Settings
+			// 1. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Settings
+			panelW, panelH := float32(220), float32(160)
+			panelX, panelY := float32(160-panelW/2), float32(160-panelH/2)
+			for i := 0; i < 4; i++ {
+				xMin := float64(panelX + 10)
+				xMax := float64(panelX + panelW - 10)
+				yMin := float64(panelY + 43 + float32(i*22))
+				yMax := float64(panelY + 61 + float32(i*22))
+
+				if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
+					g.settingActiveRow = i
+					if mouseClicked {
+						switch i {
+						case 0:
+							g.soundMuted = !g.soundMuted
+						case 1:
+							g.retroFilter = !g.retroFilter
+						case 2:
+							if g.cameraSpeed == 0.08 {
+								g.cameraSpeed = 0.15
+							} else if g.cameraSpeed == 0.15 {
+								g.cameraSpeed = 0.04
+							} else {
+								g.cameraSpeed = 0.08
+							}
+						case 3:
+							g.settingsOpen = false
+						}
+					}
+				}
+			}
+
+			// ควบคุมด้วยคีย์บอร์ดในเมนู Settings
 			if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
 				g.settingActiveRow = (g.settingActiveRow - 1 + 4) % 4
 			} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
@@ -194,7 +229,33 @@ func (g *Game) Update() error {
 				}
 			}
 		} else {
-			// ควบคุมเมนู Pause หลัก
+			// 2. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Pause หลัก
+			panelW, panelH := float32(200), float32(120)
+			panelX, panelY := float32(160-panelW/2), float32(160-panelH/2)
+			for i := 0; i < 3; i++ {
+				xMin := float64(panelX + 10)
+				xMax := float64(panelX + panelW - 10)
+				yMin := float64(panelY + 43 + float32(i*22))
+				yMax := float64(panelY + 61 + float32(i*22))
+
+				if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
+					g.pauseActiveRow = i
+					if mouseClicked {
+						switch i {
+						case 0: // Resume
+							g.isPaused = false
+						case 1: // Settings
+							g.settingsOpen = true
+							g.settingActiveRow = 0
+						case 2: // Reset Floor
+							g.loadLevel(g.currentLevelID, 1, 1)
+							g.isPaused = false
+						}
+					}
+				}
+			}
+
+			// ควบคุมด้วยคีย์บอร์ดในเมนู Pause หลัก
 			if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
 				g.pauseActiveRow = (g.pauseActiveRow - 1 + 3) % 3
 			} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
@@ -209,7 +270,6 @@ func (g *Game) Update() error {
 					g.settingsOpen = true
 					g.settingActiveRow = 0
 				case 2: // Reset Floor
-					// โหลดด่านใหม่ เริ่มต้นตำแหน่ง (1, 1) เสมอ
 					g.loadLevel(g.currentLevelID, 1, 1)
 					g.isPaused = false
 				}
