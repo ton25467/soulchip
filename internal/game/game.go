@@ -25,6 +25,9 @@ type Game struct {
 	tick              int
 	characterSelected bool
 	charSelectionRow  int
+	mainMenuOpen      bool
+	mainMenuRow       int
+
 
 
 	// ระบบกล้องเลื่อนตาม 3D Perspective Software Engine
@@ -69,6 +72,8 @@ func NewGame() *Game {
 		lastZone:          0,
 		characterSelected: false,
 		charSelectionRow:  0,
+		mainMenuOpen:      true,
+		mainMenuRow:       0,
 	}
 
 	// 1. สปินอัปเซิร์ฟเวอร์เครือข่ายจำลอง
@@ -144,8 +149,120 @@ func (g *Game) selectCharacter(charType int) {
 	g.loadLevel(1, 1, 1)
 }
 
+func (g *Game) selectMainMenuOption(option int) {
+	switch option {
+	case 0: // New Game
+		g.mainMenuOpen = false
+	case 1: // Settings
+		g.settingsOpen = true
+		g.settingActiveRow = 0
+	case 2: // Quit Game
+		os.Exit(0)
+	}
+}
+
+func (g *Game) updateSettingsInput() {
+	mx, my := ebiten.CursorPosition()
+	mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+
+	// 1. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Settings (4 ตัวเลือก)
+	for i := 0; i < 4; i++ {
+		xMin := float64(60)
+		xMax := float64(260)
+		yMin := float64(130 + i*40)
+		yMax := float64(158 + i*40)
+
+		if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
+			g.settingActiveRow = i
+			if mouseClicked {
+				switch i {
+				case 0: // Sound FX
+					g.soundMuted = !g.soundMuted
+				case 1: // CRT Filter
+					g.retroFilter = !g.retroFilter
+				case 2: // Camera Lerp speed
+					if g.cameraSpeed == 0.08 {
+						g.cameraSpeed = 0.15
+					} else if g.cameraSpeed == 0.15 {
+						g.cameraSpeed = 0.04
+					} else {
+						g.cameraSpeed = 0.08
+					}
+				case 3: // Back to Menu
+					g.settingsOpen = false
+				}
+			}
+		}
+	}
+
+	// ควบคุมด้วยคีย์บอร์ดในเมนู Settings
+	if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
+		g.settingActiveRow = (g.settingActiveRow - 1 + 4) % 4
+	} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
+		g.settingActiveRow = (g.settingActiveRow + 1) % 4
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyA) || inpututil.IsKeyJustPressed(ebiten.KeyLeft) ||
+		inpututil.IsKeyJustPressed(ebiten.KeyD) || inpututil.IsKeyJustPressed(ebiten.KeyRight) ||
+		inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		
+		switch g.settingActiveRow {
+		case 0: // Sound Effects (ON/OFF)
+			g.soundMuted = !g.soundMuted
+		case 1: // Retro Filter (ON/OFF)
+			g.retroFilter = !g.retroFilter
+		case 2: // Camera Speed (Slow / Normal / Fast)
+			if g.cameraSpeed == 0.08 {
+				g.cameraSpeed = 0.15 // Fast
+			} else if g.cameraSpeed == 0.15 {
+				g.cameraSpeed = 0.04 // Slow
+			} else {
+				g.cameraSpeed = 0.08 // Normal
+			}
+		case 3: // Back
+			g.settingsOpen = false
+		}
+	}
+}
+
 // Update อัปเดตสถานะเกม
 func (g *Game) Update() error {
+	// หากหน้าจอเมนูหลักหลัก (Main Menu) กำลังทำงาน
+	if g.mainMenuOpen {
+		if g.settingsOpen {
+			g.updateSettingsInput()
+		} else {
+			mx, my := ebiten.CursorPosition()
+			mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+
+			// 1. ตรวจจับการควบคุมด้วยเมาส์ในปุ่มเมนูหลัก (3 ตัวเลือก)
+			for i := 0; i < 3; i++ {
+				xMin, xMax := 60.0, 260.0
+				yMin := float64(160 + i*50)
+				yMax := float64(195 + i*50)
+
+				if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
+					g.mainMenuRow = i
+					if mouseClicked {
+						g.selectMainMenuOption(i)
+					}
+				}
+			}
+
+			// 2. ควบคุมด้วยคีย์บอร์ด
+			if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
+				g.mainMenuRow = (g.mainMenuRow - 1 + 3) % 3
+			} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
+				g.mainMenuRow = (g.mainMenuRow + 1) % 3
+			}
+
+			if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+				g.selectMainMenuOption(g.mainMenuRow)
+			}
+		}
+		return nil
+	}
+
 	// หากยังไม่ได้เลือกตัวละครหลัก
 	if !g.characterSelected {
 		mx, my := ebiten.CursorPosition()
@@ -215,64 +332,7 @@ func (g *Game) Update() error {
 		mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 
 		if g.settingsOpen {
-			// 1. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Settings (4 ตัวเลือก)
-			for i := 0; i < 4; i++ {
-				xMin := float64(60)
-				xMax := float64(260)
-				yMin := float64(130 + i*40)
-				yMax := float64(158 + i*40)
-
-				if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
-					g.settingActiveRow = i
-					if mouseClicked {
-						switch i {
-						case 0: // Sound FX
-							g.soundMuted = !g.soundMuted
-						case 1: // CRT Filter
-							g.retroFilter = !g.retroFilter
-						case 2: // Camera Lerp speed
-							if g.cameraSpeed == 0.08 {
-								g.cameraSpeed = 0.15
-							} else if g.cameraSpeed == 0.15 {
-								g.cameraSpeed = 0.04
-							} else {
-								g.cameraSpeed = 0.08
-							}
-						case 3: // Back to Menu
-							g.settingsOpen = false
-						}
-					}
-				}
-			}
-
-			// ควบคุมด้วยคีย์บอร์ดในเมนู Settings
-			if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
-				g.settingActiveRow = (g.settingActiveRow - 1 + 4) % 4
-			} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
-				g.settingActiveRow = (g.settingActiveRow + 1) % 4
-			}
-
-			if inpututil.IsKeyJustPressed(ebiten.KeyA) || inpututil.IsKeyJustPressed(ebiten.KeyLeft) ||
-				inpututil.IsKeyJustPressed(ebiten.KeyD) || inpututil.IsKeyJustPressed(ebiten.KeyRight) ||
-				inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
-				
-				switch g.settingActiveRow {
-				case 0: // Sound Effects (ON/OFF)
-					g.soundMuted = !g.soundMuted
-				case 1: // Retro Filter (ON/OFF)
-					g.retroFilter = !g.retroFilter
-				case 2: // Camera Speed (Slow / Normal / Fast)
-					if g.cameraSpeed == 0.08 {
-						g.cameraSpeed = 0.15 // Fast
-					} else if g.cameraSpeed == 0.15 {
-						g.cameraSpeed = 0.04 // Slow
-					} else {
-						g.cameraSpeed = 0.08 // Normal
-					}
-				case 3: // Back
-					g.settingsOpen = false
-				}
-			}
+			g.updateSettingsInput()
 		} else {
 			// 2. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Pause หลัก (4 ตัวเลือก)
 			for i := 0; i < 4; i++ {
@@ -516,6 +576,110 @@ func (g *Game) updateCameraFollow() {
 
 // Draw แสดงผลหน้าจอเกมด้วย 3D Painter's Algorithm
 func (g *Game) Draw(screen *ebiten.Image) {
+	// หากหน้าจอเมนูหลักหลัก (Main Menu) กำลังทำงาน
+	if g.mainMenuOpen {
+		screen.Fill(color.RGBA{10, 10, 12, 255})
+
+		if g.settingsOpen {
+			// ดึงเมนู Settings มาวาดโดยตรงสไตล์ภาพยนตร์
+			titleText := "S E T T I N G S"
+			titleX := float32(160 - (len(titleText)*6)/2)
+			ebitenutil.DebugPrintAt(screen, titleText, int(titleX), 80)
+			vector.StrokeLine(screen, 80, 102, 240, 102, 1.5, color.RGBA{197, 160, 89, 150}, false)
+
+			soundLabel := "ON"
+			if g.soundMuted {
+				soundLabel = "OFF"
+			}
+			filterLabel := "OFF"
+			if g.retroFilter {
+				filterLabel = "CRT"
+			}
+			speedLabel := "Normal"
+			if g.cameraSpeed == 0.04 {
+				speedLabel = "Slow"
+			} else if g.cameraSpeed == 0.15 {
+				speedLabel = "Fast"
+			}
+
+			rows := []string{
+				fmt.Sprintf("Sound FX: [%s]", soundLabel),
+				fmt.Sprintf("CRT Filter: [%s]", filterLabel),
+				fmt.Sprintf("Camera Lerp: [%s]", speedLabel),
+				"Back to Menu",
+			}
+
+			btnW, btnH := float32(200), float32(26)
+			btnX := float32(60)
+
+			for i, rowText := range rows {
+				btnY := float32(130 + i*40)
+				textX := btnX + (btnW-float32(len(rowText)*6))/2
+				textY := btnY + (btnH-12)/2
+
+				if i == g.settingActiveRow {
+					vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{197, 160, 89, 70}, false)
+					vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.5, color.RGBA{241, 196, 15, 255}, false)
+				} else {
+					vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{25, 25, 30, 150}, false)
+					vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.0, color.RGBA{70, 70, 75, 255}, false)
+				}
+				ebitenutil.DebugPrintAt(screen, rowText, int(textX), int(textY))
+			}
+
+			helpText := "[W/S] Navigate  [Space/Enter/A/D] Toggle"
+			helpX := float32(160 - (len(helpText)*6)/2)
+			ebitenutil.DebugPrintAt(screen, helpText, int(helpX), 300)
+		} else {
+			// หน้าจอหน้าหลักของเกมหลัก (Main Menu Title Screen)
+			titleText := "S O U L C H I P"
+			titleX := float32(160 - (len(titleText)*6)/2)
+			ebitenutil.DebugPrintAt(screen, titleText, int(titleX), 70)
+			
+			subtitleText := "3D SURVIVAL HORROR PUZZLE"
+			subX := float32(160 - (len(subtitleText)*6)/2)
+			ebitenutil.DebugPrintAt(screen, subtitleText, int(subX), 92)
+			vector.StrokeLine(screen, 40, 110, 280, 110, 1.5, color.RGBA{197, 160, 89, 150}, false)
+
+			rows := []string{
+				"New Game",
+				"Settings",
+				"Quit Game",
+			}
+
+			btnW, btnH := float32(200), float32(26)
+			btnX := float32(60)
+
+			for i, rowText := range rows {
+				btnY := float32(160 + i*50)
+				textX := btnX + (btnW-float32(len(rowText)*6))/2
+				textY := btnY + (btnH-12)/2
+
+				if i == g.mainMenuRow {
+					vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{197, 160, 89, 70}, false)
+					vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.5, color.RGBA{241, 196, 15, 255}, false)
+				} else {
+					vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{25, 25, 30, 150}, false)
+					vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.0, color.RGBA{70, 70, 75, 255}, false)
+				}
+				ebitenutil.DebugPrintAt(screen, rowText, int(textX), int(textY))
+			}
+
+			helpText := "[W/S] Navigate  [Space/Enter] Confirm"
+			helpX := float32(160 - (len(helpText)*6)/2)
+			ebitenutil.DebugPrintAt(screen, helpText, int(helpX), 310)
+		}
+
+		// เคลือบ CRT retro filter ถ้าเปิดอยู่
+		if g.retroFilter {
+			for y := 0; y < 320; y += 2 {
+				vector.StrokeLine(screen, 0, float32(y), 320, float32(y), 1.0, color.RGBA{0, 0, 0, 45}, false)
+			}
+			vector.DrawFilledRect(screen, 0, 0, 320, 320, color.RGBA{243, 156, 18, 12}, false)
+		}
+		return
+	}
+
 	if !g.characterSelected {
 		screen.Fill(color.RGBA{10, 10, 12, 255})
 
