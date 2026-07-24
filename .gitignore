@@ -21,3 +21,8 @@ service_account.json
 
 # Deployment and push scripts containing tokens
 report/create_and_push_repo.py
+
+# Ignore all markdown files in the repository
+*.md
+**/*.md
+
