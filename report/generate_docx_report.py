@@ -33,6 +33,10 @@ TEAMS = {
     "deploy_team": {
         "en": "Deploy Team",
         "th": "ทีมส่งมอบและติดตั้งระบบ"
+    },
+    "story_writer": {
+        "en": "Story Writer Team",
+        "th": "ทีมเขียนเนื้อเรื่องและออกแบบการบรรยาย"
     }
 }
 
@@ -56,7 +60,9 @@ TEST_TEAM_MAP = {
     "TestAdversarial_ItemSwapLogic": "ux_ui_designer",
     "TestAdversarial_PerFloorIsolation": "ux_ui_designer",
     
-    "TestCategorizedErrorReporting": "testing_team"
+    "TestCategorizedErrorReporting": "testing_team",
+    
+    "TestCharacterSelection": "story_writer"
 }
 
 def run_tests():
