@@ -532,15 +532,98 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	helperX := hudWidth - 90
+	helperX := hudWidth - 85
 	helperY := hudY + (hudHeight-24)/2
-	vector.DrawFilledRect(screen, helperX, helperY, 74, 24, color.RGBA{30, 30, 35, 255}, false)
-	vector.StrokeRect(screen, helperX, helperY, 74, 24, 1.0, color.RGBA{231, 76, 60, 255}, false)
+	
+	// วาดกรอบสีเขียว/เหลือง/แดงตามสถานะชีพจร (ECG Frame)
+	vector.DrawFilledRect(screen, helperX, helperY, 74, 24, color.RGBA{10, 10, 15, 255}, false)
 
-	btnX := helperX + 16
-	btnY := helperY + 12
-	vector.DrawFilledCircle(screen, btnX, btnY, 6, color.RGBA{231, 76, 60, 255}, false)
-	vector.StrokeCircle(screen, btnX, btnY, 4, 1.5, color.RGBA{255, 255, 255, 255}, false)
+	// คำนวณหาระยะอันตรายที่ใกล้ที่สุด (มินิบอส หรือ ประตูทางออกด่าน)
+	playerX, playerY := g.player.GridX, g.player.GridY
+	minDist := 999.0
+	for y := 0; y < g.level.Height; y++ {
+		for x := 0; x < g.level.Width; x++ {
+			tile := g.level.Tiles[y][x]
+			if tile == TileSecretBoss || tile == TileGoal {
+				dist := math.Sqrt(float64((x-playerX)*(x-playerX) + (y-playerY)*(y-playerY)))
+				if dist < minDist {
+					minDist = dist
+				}
+			}
+		}
+	}
+
+	panicLevel := 0.0
+	if minDist <= 2.0 {
+		panicLevel = 1.0
+	} else if minDist >= 8.0 {
+		panicLevel = 0.0
+	} else {
+		panicLevel = 1.0 - (minDist-2.0)/6.0
+	}
+
+	ecgColor := color.RGBA{46, 204, 113, 255} // Green (Fine)
+	speedFactor := 0.08
+	waveAmp := 4.0
+	if panicLevel > 0.7 {
+		ecgColor = color.RGBA{231, 76, 60, 255} // Red (Danger)
+		speedFactor = 0.32
+		waveAmp = 8.0
+	} else if panicLevel > 0.3 {
+		ecgColor = color.RGBA{241, 196, 15, 255} // Yellow (Caution)
+		speedFactor = 0.16
+		waveAmp = 6.0
+	}
+
+	vector.StrokeRect(screen, helperX, helperY, 74, 24, 1.0, ecgColor, false)
+
+	// วาดคลื่นหัวใจ ECG กราฟิกจำลองวิ่งข้ามหน้าต่างตรวจจับสัญญาณชีพจร
+	for i := 0; i < 68; i++ {
+		phase := math.Mod(float64(g.tick)*speedFactor-float64(i)*0.18, 2.0*math.Pi)
+		var val float64 = 0
+		if phase > 0 && phase < 0.3 {
+			val = math.Sin(phase*math.Pi/0.3) * 1.5
+		} else if phase >= 0.3 && phase < 0.5 {
+			val = -(phase - 0.3) / 0.2 * 3.0
+		} else if phase >= 0.5 && phase < 0.7 {
+			val = -3.0 + (phase-0.5)/0.2*13.0
+		} else if phase >= 0.7 && phase < 0.9 {
+			val = 10.0 - (phase-0.7)/0.2*14.0
+		} else if phase >= 0.9 && phase < 1.2 {
+			val = -4.0 + math.Sin((phase-0.9)*math.Pi/0.3)*2.0
+		}
+		
+		yOffset := float32(val * (waveAmp / 6.0))
+		if yOffset < -10 {
+			yOffset = -10
+		} else if yOffset > 10 {
+			yOffset = 10
+		}
+
+		if i > 0 {
+			prevPhase := math.Mod(float64(g.tick)*speedFactor-float64(i-1)*0.18, 2.0*math.Pi)
+			var prevVal float64 = 0
+			if prevPhase > 0 && prevPhase < 0.3 {
+				prevVal = math.Sin(prevPhase*math.Pi/0.3) * 1.5
+			} else if prevPhase >= 0.3 && prevPhase < 0.5 {
+				prevVal = -(prevPhase - 0.3) / 0.2 * 3.0
+			} else if prevPhase >= 0.5 && prevPhase < 0.7 {
+				prevVal = -3.0 + (prevPhase-0.5)/0.2*13.0
+			} else if prevPhase >= 0.7 && prevPhase < 0.9 {
+				prevVal = 10.0 - (prevPhase-0.7)/0.2*14.0
+			} else if prevPhase >= 0.9 && prevPhase < 1.2 {
+				prevVal = -4.0 + math.Sin((prevPhase-0.9)*math.Pi/0.3)*2.0
+			}
+			prevYOffset := float32(prevVal * (waveAmp / 6.0))
+			if prevYOffset < -10 {
+				prevYOffset = -10
+			} else if prevYOffset > 10 {
+				prevYOffset = 10
+			}
+
+			vector.StrokeLine(screen, helperX+71-float32(i), helperY+12+prevYOffset, helperX+72-float32(i), helperY+12+yOffset, 1.0, ecgColor, false)
+		}
+	}
 
 	// 7. วาด Performance overlay (FPS/TPS)
 	fps := ebiten.ActualFPS()

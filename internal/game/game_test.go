@@ -455,3 +455,58 @@ func TestCategorizedErrorReporting(t *testing.T) {
 		t.Errorf("SendCategorizedReport returned error for test_suite_failure: %v", err)
 	}
 }
+
+// TestDiagonalSlidingCollision ทดสอบการเคลื่อนที่แนวเฉียงและการสไลด์ตามผนัง
+func TestDiagonalSlidingCollision(t *testing.T) {
+	// สร้างด่านทดสอบขนาด 3x3
+	level := &Level{
+		Width:  3,
+		Height: 3,
+		Tiles: [][]TileType{
+			{TileEmpty, TileEmpty, TileEmpty},
+			{TileEmpty, TileEmpty, TileWall}, // กำแพงที่ (2,1)
+			{TileEmpty, TileEmpty, TileEmpty},
+		},
+	}
+
+	player := NewPlayer(1, 1) // ตรงกลางด่าน
+	player.SetInput(1, -1)    // พยายามเดินตะวันออกเฉียงเหนือ -> ไปที่ (2,0)
+	
+	player.Update(level)
+	if !player.isMoving {
+		t.Error("Expected player to start moving diagonally, but isMoving is false")
+	}
+	
+	for player.isMoving {
+		player.moveTicks++
+		if player.moveTicks >= player.maxTicks {
+			player.GridX = player.targetGridX
+			player.GridY = player.targetGridY
+			player.isMoving = false
+		}
+	}
+	if player.GridX != 2 || player.GridY != 0 {
+		t.Errorf("Expected diagonal move to (2,0), but got (%d,%d)", player.GridX, player.GridY)
+	}
+
+	// คราวนี้ทดสอบการสไลด์เมื่อโดนสกัดจุดปลายทาง:
+	levelBlocked := &Level{
+		Width:  3,
+		Height: 3,
+		Tiles: [][]TileType{
+			{TileEmpty, TileEmpty, TileWall},  // ปลายทาง (2,0) เป็นกำแพง
+			{TileEmpty, TileEmpty, TileEmpty}, // ด้านขวา (2,1) ว่าง
+			{TileEmpty, TileEmpty, TileEmpty},
+		},
+	}
+
+	player2 := NewPlayer(1, 1)
+	player2.SetInput(1, -1) // พยายามเดินเฉียงขวาบนไป (2,0) ซึ่งมีกำแพงขวาง
+	player2.Update(levelBlocked)
+
+	// เนื่องจากปลายทางบล็อก แต่ช่องขวา (2,1) ปลอดโปร่ง Gopher ควรเบี่ยงข้างสไลด์ระนาบไปทางขวาที่ (2,1)
+	if player2.targetGridX != 2 || player2.targetGridY != 1 {
+		t.Errorf("Expected horizontal sliding resolution to (2,1), but target is (%d,%d)", player2.targetGridX, player2.targetGridY)
+	}
+}
+

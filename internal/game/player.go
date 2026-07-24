@@ -107,47 +107,76 @@ func (p *Player) Update(level *Level) {
 			dx, dy = p.inputDx, p.inputDy
 			p.inputDx = 0
 			p.inputDy = 0
-		} else if ebiten.IsKeyPressed(ebiten.KeyArrowUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
-			dy = -1
-		} else if ebiten.IsKeyPressed(ebiten.KeyArrowDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
-			dy = 1
-		} else if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
-			dx = -1
-		} else if ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
-			dx = 1
+		} else {
+			// รองรับการป้อนข้อมูลแนวเฉียง (Diagonal Inputs)
+			if ebiten.IsKeyPressed(ebiten.KeyArrowUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
+				dy = -1
+			} else if ebiten.IsKeyPressed(ebiten.KeyArrowDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
+				dy = 1
+			}
+
+			if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
+				dx = -1
+			} else if ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
+				dx = 1
+			}
 		}
 
 		if dx != 0 || dy != 0 {
 			newX := p.GridX + dx
 			newY := p.GridY + dy
 
-			// ตรวจสอบระบบไขประตูแดง/น้ำเงินด้วยไอเทมในสัมภาระ
-			if newX >= 0 && newX < level.Width && newY >= 0 && newY < level.Height {
-				tile := level.Tiles[newY][newX]
-				if tile == TileRedDoor {
-					if p.hasItem(ItemRedKey) {
-						p.removeItem(ItemRedKey)
-						level.Tiles[newY][newX] = TileEmpty
-					}
-				} else if tile == TileBlueDoor {
-					if p.hasItem(ItemBlueKey) {
-						p.removeItem(ItemBlueKey)
-						level.Tiles[newY][newX] = TileEmpty
+			// ระบบวิเคราะห์ทิศทางและชนสไลด์กำแพง (Sliding Collision Resolution)
+			if dx != 0 && dy != 0 {
+				// ตรวจสอบว่าช่องปลายทางเฉียงติดกำแพงหรือไม่
+				if level.IsWall(newX, newY) {
+					// ลองสไลด์แนวระนาบก่อน (Horizontal slide)
+					if !level.IsWall(p.GridX+dx, p.GridY) {
+						newX = p.GridX + dx
+						newY = p.GridY
+						dy = 0
+					} else if !level.IsWall(p.GridX, p.GridY+dy) { // ลองสไลด์แนวดิ่ง (Vertical slide)
+						newX = p.GridX
+						newY = p.GridY + dy
+						dx = 0
+					} else {
+						// ไปต่อไม่ได้ทั้งสองแกน
+						dx = 0
+						dy = 0
 					}
 				}
 			}
 
-			// บังคับเดินถ้าช่องปลายทางเป็นพื้นว่างหรือบันได (IsWall คืนค่า false สำหรับบันได)
-			if !level.IsWall(newX, newY) {
-				p.isMoving = true
-				p.targetGridX = newX
-				p.targetGridY = newY
-				p.moveTicks = 1
+			// ถ้าทิศทางสุทธิที่สไลด์แล้วยังมีผลให้เคลื่อนที่ได้
+			if dx != 0 || dy != 0 {
+				// ตรวจสอบระบบไขประตูแดง/น้ำเงินด้วยไอเทมในสัมภาระ
+				if newX >= 0 && newX < level.Width && newY >= 0 && newY < level.Height {
+					tile := level.Tiles[newY][newX]
+					if tile == TileRedDoor {
+						if p.hasItem(ItemRedKey) {
+							p.removeItem(ItemRedKey)
+							level.Tiles[newY][newX] = TileEmpty
+						}
+					} else if tile == TileBlueDoor {
+						if p.hasItem(ItemBlueKey) {
+							p.removeItem(ItemBlueKey)
+							level.Tiles[newY][newX] = TileEmpty
+						}
+					}
+				}
 
-				if ebiten.IsKeyPressed(ebiten.KeyShiftLeft) {
-					p.maxTicks = 5
-				} else {
-					p.maxTicks = 10
+				// บังคับเดินถ้าช่องปลายทางเป็นพื้นว่างหรือบันได (IsWall คืนค่า false สำหรับบันได)
+				if !level.IsWall(newX, newY) {
+					p.isMoving = true
+					p.targetGridX = newX
+					p.targetGridY = newY
+					p.moveTicks = 1
+
+					if ebiten.IsKeyPressed(ebiten.KeyShiftLeft) {
+						p.maxTicks = 5
+					} else {
+						p.maxTicks = 10
+					}
 				}
 			}
 		}
