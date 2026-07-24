@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"os"
 	"sort"
 	"time"
 
@@ -166,24 +167,22 @@ func (g *Game) Update() error {
 		mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 
 		if g.settingsOpen {
-			// 1. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Settings
-			panelW, panelH := float32(220), float32(160)
-			panelX, panelY := float32(160-panelW/2), float32(160-panelH/2)
+			// 1. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Settings (4 ตัวเลือก)
 			for i := 0; i < 4; i++ {
-				xMin := float64(panelX + 10)
-				xMax := float64(panelX + panelW - 10)
-				yMin := float64(panelY + 43 + float32(i*22))
-				yMax := float64(panelY + 61 + float32(i*22))
+				xMin := float64(60)
+				xMax := float64(260)
+				yMin := float64(130 + i*40)
+				yMax := float64(158 + i*40)
 
 				if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
 					g.settingActiveRow = i
 					if mouseClicked {
 						switch i {
-						case 0:
+						case 0: // Sound FX
 							g.soundMuted = !g.soundMuted
-						case 1:
+						case 1: // CRT Filter
 							g.retroFilter = !g.retroFilter
-						case 2:
+						case 2: // Camera Lerp speed
 							if g.cameraSpeed == 0.08 {
 								g.cameraSpeed = 0.15
 							} else if g.cameraSpeed == 0.15 {
@@ -191,7 +190,7 @@ func (g *Game) Update() error {
 							} else {
 								g.cameraSpeed = 0.08
 							}
-						case 3:
+						case 3: // Back to Menu
 							g.settingsOpen = false
 						}
 					}
@@ -223,20 +222,16 @@ func (g *Game) Update() error {
 						g.cameraSpeed = 0.08 // Normal
 					}
 				case 3: // Back
-					if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
-						g.settingsOpen = false
-					}
+					g.settingsOpen = false
 				}
 			}
 		} else {
-			// 2. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Pause หลัก
-			panelW, panelH := float32(200), float32(120)
-			panelX, panelY := float32(160-panelW/2), float32(160-panelH/2)
-			for i := 0; i < 3; i++ {
-				xMin := float64(panelX + 10)
-				xMax := float64(panelX + panelW - 10)
-				yMin := float64(panelY + 43 + float32(i*22))
-				yMax := float64(panelY + 61 + float32(i*22))
+			// 2. ตรวจสอบการโฮเวอร์และคลิกของเมาส์ในเมนู Pause หลัก (4 ตัวเลือก)
+			for i := 0; i < 4; i++ {
+				xMin := float64(60)
+				xMax := float64(260)
+				yMin := float64(130 + i*40)
+				yMax := float64(158 + i*40)
 
 				if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
 					g.pauseActiveRow = i
@@ -250,6 +245,8 @@ func (g *Game) Update() error {
 						case 2: // Reset Floor
 							g.loadLevel(g.currentLevelID, 1, 1)
 							g.isPaused = false
+						case 3: // Quit to Desktop
+							os.Exit(0)
 						}
 					}
 				}
@@ -257,9 +254,9 @@ func (g *Game) Update() error {
 
 			// ควบคุมด้วยคีย์บอร์ดในเมนู Pause หลัก
 			if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
-				g.pauseActiveRow = (g.pauseActiveRow - 1 + 3) % 3
+				g.pauseActiveRow = (g.pauseActiveRow - 1 + 4) % 4
 			} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
-				g.pauseActiveRow = (g.pauseActiveRow + 1) % 3
+				g.pauseActiveRow = (g.pauseActiveRow + 1) % 4
 			}
 
 			if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
@@ -272,6 +269,8 @@ func (g *Game) Update() error {
 				case 2: // Reset Floor
 					g.loadLevel(g.currentLevelID, 1, 1)
 					g.isPaused = false
+				case 3: // Quit to Desktop
+					os.Exit(0)
 				}
 			}
 		}
@@ -720,14 +719,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		} else {
 			// โหมด Menu Pause (ปุ่ม Esc)
 			if g.settingsOpen {
-				// เมนูย่อย Settings
-				panelW, panelH := float32(220), float32(160)
-				panelX, panelY := float32(160-panelW/2), float32(160-panelH/2)
-
-				vector.DrawFilledRect(screen, panelX, panelY, panelW, panelH, color.RGBA{15, 15, 20, 255}, false)
-				vector.StrokeRect(screen, panelX, panelY, panelW, panelH, 2.0, color.RGBA{197, 160, 89, 255}, false)
-
-				ebitenutil.DebugPrintAt(screen, "--- SETTINGS (ตั้งค่า) ---", int(panelX)+30, int(panelY)+15)
+				// 1. หน้าจอเมนูตั้งค่า Settings
+				titleText := "S E T T I N G S"
+				titleX := float32(160 - (len(titleText)*6)/2)
+				ebitenutil.DebugPrintAt(screen, titleText, int(titleX), 80)
+				vector.StrokeLine(screen, 80, 102, 240, 102, 1.5, color.RGBA{197, 160, 89, 150}, false)
 
 				soundLabel := "ON"
 				if g.soundMuted {
@@ -745,53 +741,74 @@ func (g *Game) Draw(screen *ebiten.Image) {
 				}
 
 				rows := []string{
-					fmt.Sprintf("Sound FX:    [%s]", soundLabel),
-					fmt.Sprintf("CRT Filter:  [%s]", filterLabel),
-					fmt.Sprintf("Camera Cam:  [%s]", speedLabel),
-					"Back to Menu (ย้อนกลับ)",
+					fmt.Sprintf("Sound FX: [%s]", soundLabel),
+					fmt.Sprintf("CRT Filter: [%s]", filterLabel),
+					fmt.Sprintf("Camera Lerp: [%s]", speedLabel),
+					"Back to Menu",
 				}
 
+				btnW, btnH := float32(200), float32(26)
+				btnX := float32(60)
+
 				for i, rowText := range rows {
-					rowY := panelY + 45 + float32(i*22)
+					btnY := float32(130 + i*40)
+					textX := btnX + (btnW-float32(len(rowText)*6))/2
+					textY := btnY + (btnH-12)/2
+
 					if i == g.settingActiveRow {
-						// วาดแถบไฮไลต์สีทอง
-						vector.DrawFilledRect(screen, panelX+10, rowY-2, panelW-20, 18, color.RGBA{197, 160, 89, 50}, false)
-						vector.StrokeRect(screen, panelX+10, rowY-2, panelW-20, 18, 1.0, color.RGBA{241, 196, 15, 255}, false)
-						ebitenutil.DebugPrintAt(screen, "> "+rowText, int(panelX)+15, int(rowY))
+						// ปุ่มที่กำลังถูกเลือก: ไฮไลต์สีทองสว่าง
+						vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{197, 160, 89, 70}, false)
+						vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.5, color.RGBA{241, 196, 15, 255}, false)
+						ebitenutil.DebugPrintAt(screen, rowText, int(textX), int(textY))
 					} else {
-						ebitenutil.DebugPrintAt(screen, "  "+rowText, int(panelX)+15, int(rowY))
+						// ปุ่มปกติ: กรอบสีเข้มโปร่งแสง
+						vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{25, 25, 30, 150}, false)
+						vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.0, color.RGBA{70, 70, 75, 255}, false)
+						ebitenutil.DebugPrintAt(screen, rowText, int(textX), int(textY))
 					}
 				}
 
-				ebitenutil.DebugPrintAt(screen, "[W/S]Move [A/D/Space]Toggle", int(panelX)+28, int(panelY)+142)
+				helpText := "[W/S] Navigate  [Space/Enter/A/D] Toggle"
+				helpX := float32(160 - (len(helpText)*6)/2)
+				ebitenutil.DebugPrintAt(screen, helpText, int(helpX), 300)
 			} else {
-				// เมนูหลัก Pause
-				panelW, panelH := float32(200), float32(120)
-				panelX, panelY := float32(160-panelW/2), float32(160-panelH/2)
-
-				vector.DrawFilledRect(screen, panelX, panelY, panelW, panelH, color.RGBA{15, 15, 20, 255}, false)
-				vector.StrokeRect(screen, panelX, panelY, panelW, panelH, 2.0, color.RGBA{197, 160, 89, 255}, false)
-
-				ebitenutil.DebugPrintAt(screen, "--- GAME MENU (หยุดเกม) ---", int(panelX)+24, int(panelY)+15)
+				// 2. หน้าจอเมนูหยุดเกมหลัก Pause Menu
+				titleText := "P A U S E D"
+				titleX := float32(160 - (len(titleText)*6)/2)
+				ebitenutil.DebugPrintAt(screen, titleText, int(titleX), 80)
+				vector.StrokeLine(screen, 80, 102, 240, 102, 1.5, color.RGBA{197, 160, 89, 150}, false)
 
 				rows := []string{
-					"Resume Game (เล่นต่อ)",
-					"Settings (ตั้งค่า)",
-					"Restart Floor (เริ่มใหม่ด่านนี้)",
+					"Resume Game",
+					"Settings",
+					"Restart Floor",
+					"Quit to Desktop",
 				}
 
+				btnW, btnH := float32(200), float32(26)
+				btnX := float32(60)
+
 				for i, rowText := range rows {
-					rowY := panelY + 45 + float32(i*22)
+					btnY := float32(130 + i*40)
+					textX := btnX + (btnW-float32(len(rowText)*6))/2
+					textY := btnY + (btnH-12)/2
+
 					if i == g.pauseActiveRow {
-						vector.DrawFilledRect(screen, panelX+10, rowY-2, panelW-20, 18, color.RGBA{197, 160, 89, 50}, false)
-						vector.StrokeRect(screen, panelX+10, rowY-2, panelW-20, 18, 1.0, color.RGBA{241, 196, 15, 255}, false)
-						ebitenutil.DebugPrintAt(screen, "> "+rowText, int(panelX)+15, int(rowY))
+						// ปุ่มที่กำลังถูกเลือก: ไฮไลต์สีทองสว่าง
+						vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{197, 160, 89, 70}, false)
+						vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.5, color.RGBA{241, 196, 15, 255}, false)
+						ebitenutil.DebugPrintAt(screen, rowText, int(textX), int(textY))
 					} else {
-						ebitenutil.DebugPrintAt(screen, "  "+rowText, int(panelX)+15, int(rowY))
+						// ปุ่มปกติ: กรอบสีเข้มโปร่งแสง
+						vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{25, 25, 30, 150}, false)
+						vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.0, color.RGBA{70, 70, 75, 255}, false)
+						ebitenutil.DebugPrintAt(screen, rowText, int(textX), int(textY))
 					}
 				}
 
-				ebitenutil.DebugPrintAt(screen, "[W/S]Navigate [Space/Enter]Select", int(panelX)+12, int(panelY)+102)
+				helpText := "[W/S] Navigate  [Space/Enter] Select"
+				helpX := float32(160 - (len(helpText)*6)/2)
+				ebitenutil.DebugPrintAt(screen, helpText, int(helpX), 300)
 			}
 		}
 	}
