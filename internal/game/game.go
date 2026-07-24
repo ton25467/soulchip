@@ -341,8 +341,8 @@ func (g *Game) Update() error {
 		return nil
 	}
 
-	// Performance Monitoring for FPS/TPS drops
-	if !g.loading && g.tick > 120 {
+	// Performance Monitoring for FPS/TPS drops (วอร์มอัป 300 ticks หรือ 5 วินาทีแรก)
+	if !g.loading && g.tick > 300 {
 		currentFPS := ebiten.ActualFPS()
 		currentTPS := ebiten.ActualTPS()
 		if currentFPS < 55.0 || currentTPS < 55.0 {
