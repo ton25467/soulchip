@@ -51,6 +51,7 @@ type Game struct {
 	soundMuted       bool
 	retroFilter      bool
 	cameraSpeed      float64
+	lastZone         int
 }
 
 func NewGame() *Game {
@@ -62,6 +63,7 @@ func NewGame() *Game {
 		selectedSlot:   0,
 		boxInventories: make(map[int][]ItemType),
 		cameraSpeed:    0.08,
+		lastZone:       0,
 	}
 
 	// 1. สปินอัปเซิร์ฟเวอร์เครือข่ายจำลอง
@@ -420,11 +422,45 @@ func (g *Game) Update() error {
 
 // updateCameraFollow อัปเดตพิกัดเลื่อนกล้องตามตำแหน่งผู้เล่นในโลก 3 มิติ
 func (g *Game) updateCameraFollow() {
-	px, py, pz := g.player.Get3DPos()
-	targetX := px - 30.0
-	targetY := py - 140.0
-	targetZ := pz - 150.0
+	gridX := g.player.GridX
+	gridY := g.player.GridY
 
+	var targetX, targetY, targetZ float64
+
+	// แบ่งแผนที่ออกเป็น 4 โซนย่อยหลักตามตรรกะ Resident Evil 1 Remake Fixed Cameras
+	if gridX < 6 && gridY < 6 {
+		// โซน 1: พิกัดกล้องมุมสูงฝั่งเริ่มเกม (Spawn Area)
+		targetX = 66.0
+		targetY = -130.0
+		targetZ = 66.0
+	} else if gridX >= 6 && gridY < 6 {
+		// โซน 2: พิกัดกล้องตรวจการทางขวาบน (Corridor East)
+		targetX = 260.0
+		targetY = -140.0
+		targetZ = 60.0
+	} else if gridX < 6 && gridY >= 6 {
+		// โซน 3: พิกัดกล้องตรวจการทางซ้ายล่าง (Corridor West)
+		targetX = 60.0
+		targetY = -130.0
+		targetZ = 260.0
+	} else {
+		// โซน 4: พิกัดกล้องมุมสูงฝั่งประตูทางออกและบันได (Exit & Stairs Area)
+		targetX = 260.0
+		targetY = -120.0
+		targetZ = 260.0
+	}
+
+	// บังคับล็อคเป้าทันทีหากเพิ่งโหลดแผนที่ข้ามชั้นเพื่อไม่ให้เกิดการส่ายกล้องข้ามฉาก
+	if g.lastZone == 0 {
+		g.camX = targetX
+		g.camY = targetY
+		g.camZ = targetZ
+		g.lastZone = 1
+		return
+	}
+
+	// เคลื่อนกล้องด้วยอัตรา Lerp หาพิกัดล็อคในด่าน (PAN Transition) 
+	// เพื่อคงความรู้สึกมุมกล้องภาพยนตร์ของ Resident Evil 1 Remake
 	g.camX += (targetX - g.camX) * g.cameraSpeed
 	g.camY += (targetY - g.camY) * g.cameraSpeed
 	g.camZ += (targetZ - g.camZ) * g.cameraSpeed
