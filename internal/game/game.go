@@ -238,10 +238,10 @@ func (g *Game) Update() error {
 	if !g.loading && g.tick > 120 {
 		currentFPS := ebiten.ActualFPS()
 		currentTPS := ebiten.ActualTPS()
-		if currentFPS < 60.0 || currentTPS < 60.0 {
+		if currentFPS < 55.0 || currentTPS < 55.0 {
 			if time.Since(g.lastFPSReportTime) >= 5*time.Second {
 				g.lastFPSReportTime = time.Now()
-				go SendCategorizedReport(g.serverURL, "fps_drop", currentFPS, currentTPS, g.currentLevelID, fmt.Sprintf("FPS/TPS dropped below 60.0 (FPS: %.1f, TPS: %.1f)", currentFPS, currentTPS))
+				go SendCategorizedReport(g.serverURL, "fps_drop", currentFPS, currentTPS, g.currentLevelID, fmt.Sprintf("FPS/TPS dropped below threshold (FPS: %.1f, TPS: %.1f)", currentFPS, currentTPS))
 			}
 		}
 	}
