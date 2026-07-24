@@ -15,14 +15,17 @@ import (
 )
 
 type Game struct {
-	level          *Level
-	player         *Player
-	loading        bool
-	err            error
-	serverURL      string
-	currentLevelID int
-	victory        bool
-	tick           int
+	level             *Level
+	player            *Player
+	loading           bool
+	err               error
+	serverURL         string
+	currentLevelID    int
+	victory           bool
+	tick              int
+	characterSelected bool
+	charSelectionRow  int
+
 
 	// ระบบกล้องเลื่อนตาม 3D Perspective Software Engine
 	camX float64
@@ -56,27 +59,25 @@ type Game struct {
 
 func NewGame() *Game {
 	g := &Game{
-		level:          NewDefaultLevel(),
-		player:         NewPlayer(1, 1),
-		loading:        true,
-		currentLevelID: 1,
-		selectedSlot:   0,
-		boxInventories: make(map[int][]ItemType),
-		cameraSpeed:    0.08,
-		lastZone:       0,
+		level:             NewDefaultLevel(),
+		player:            NewPlayer(1, 1),
+		loading:           false,
+		currentLevelID:    1,
+		selectedSlot:      0,
+		boxInventories:    make(map[int][]ItemType),
+		cameraSpeed:       0.08,
+		lastZone:          0,
+		characterSelected: false,
+		charSelectionRow:  0,
 	}
 
 	// 1. สปินอัปเซิร์ฟเวอร์เครือข่ายจำลอง
 	serverURL, err := StartMockServer()
 	if err != nil {
-		g.loading = false
 		g.err = err
 		return g
 	}
 	g.serverURL = serverURL
-
-	// 2. โหลดด่านแรก
-	g.loadLevel(1, 1, 1)
 
 	// ตั้งเป้าพิกัดกล้องเริ่มต้น 3D ให้ Snap ทันทีที่ผู้เล่น (1,1)
 	px := (1.0 - 5.5) * 20.0
@@ -129,8 +130,53 @@ func (g *Game) loadLevel(id int, startX, startY int) {
 	}()
 }
 
+func (g *Game) selectCharacter(charType int) {
+	g.player.CharType = charType
+	g.player.Inventory = make([]ItemType, 0)
+	if charType == 0 {
+		g.player.MaxInventory = 5
+		g.player.Inventory = append(g.player.Inventory, ItemEnergyChip)
+	} else {
+		g.player.MaxInventory = 6
+		g.player.Inventory = append(g.player.Inventory, ItemBlueKey)
+	}
+	g.characterSelected = true
+	g.loadLevel(1, 1, 1)
+}
+
 // Update อัปเดตสถานะเกม
 func (g *Game) Update() error {
+	// หากยังไม่ได้เลือกตัวละครหลัก
+	if !g.characterSelected {
+		mx, my := ebiten.CursorPosition()
+		mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+
+		// 1. ตรวจจับตำแหน่งเมาส์ในตัวเลือก
+		for i := 0; i < 2; i++ {
+			xMin, xMax := 30.0, 290.0
+			yMin := float64(130 + i*80)
+			yMax := float64(190 + i*80)
+
+			if float64(mx) >= xMin && float64(mx) <= xMax && float64(my) >= yMin && float64(my) <= yMax {
+				g.charSelectionRow = i
+				if mouseClicked {
+					g.selectCharacter(i)
+				}
+			}
+		}
+
+		// 2. ควบคุมด้วยคีย์บอร์ด
+		if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
+			g.charSelectionRow = (g.charSelectionRow - 1 + 2) % 2
+		} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
+			g.charSelectionRow = (g.charSelectionRow + 1) % 2
+		}
+
+		if inpututil.IsKeyJustPressed(ebiten.KeySpace) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+			g.selectCharacter(g.charSelectionRow)
+		}
+		return nil
+	}
 	// เช็คการกดปุ่มเพื่อสั่ง Pause / Unpause / จัดการเมนู Settings
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		if g.isPaused && g.simplePause {
@@ -324,13 +370,13 @@ func (g *Game) Update() error {
 		cap := GetBoxCapacityForFloor(g.currentLevelID)
 		if inpututil.IsKeyJustPressed(ebiten.KeyW) || inpututil.IsKeyJustPressed(ebiten.KeyUp) {
 			if g.boxActiveCol == 0 {
-				g.boxPlayerSlot = (g.boxPlayerSlot - 1 + 5) % 5
+				g.boxPlayerSlot = (g.boxPlayerSlot - 1 + g.player.MaxInventory) % g.player.MaxInventory
 			} else if cap > 0 {
 				g.boxItemSlot = (g.boxItemSlot - 1 + cap) % cap
 			}
 		} else if inpututil.IsKeyJustPressed(ebiten.KeyS) || inpututil.IsKeyJustPressed(ebiten.KeyDown) {
 			if g.boxActiveCol == 0 {
-				g.boxPlayerSlot = (g.boxPlayerSlot + 1) % 5
+				g.boxPlayerSlot = (g.boxPlayerSlot + 1) % g.player.MaxInventory
 			} else if cap > 0 {
 				g.boxItemSlot = (g.boxItemSlot + 1) % cap
 			}
@@ -384,10 +430,12 @@ func (g *Game) Update() error {
 		g.selectedSlot = 3
 	} else if inpututil.IsKeyJustPressed(ebiten.Key5) {
 		g.selectedSlot = 4
+	} else if inpututil.IsKeyJustPressed(ebiten.Key6) && g.player.MaxInventory >= 6 {
+		g.selectedSlot = 5
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
-		g.selectedSlot = (g.selectedSlot + 1) % 5
+		g.selectedSlot = (g.selectedSlot + 1) % g.player.MaxInventory
 	}
 
 	// 3. ตรวจจับการทิ้งไอเทมลงพื้นตารางกริด [Q] หรือ [Backspace]
@@ -468,6 +516,62 @@ func (g *Game) updateCameraFollow() {
 
 // Draw แสดงผลหน้าจอเกมด้วย 3D Painter's Algorithm
 func (g *Game) Draw(screen *ebiten.Image) {
+	if !g.characterSelected {
+		screen.Fill(color.RGBA{10, 10, 12, 255})
+
+		// หัวเรื่อง
+		title := "CHOOSE MAIN CHARACTER"
+		titleX := float32(160 - (len(title)*6)/2)
+		ebitenutil.DebugPrintAt(screen, title, int(titleX), 40)
+		vector.StrokeLine(screen, 40, 60, 280, 60, 1.5, color.RGBA{197, 160, 89, 150}, false)
+
+		// สองตัวเลือก: Gopher vs Rust
+		rows := []struct {
+			name  string
+			desc  string
+			desc2 string
+			col   color.RGBA
+		}{
+			{
+				name:  "GOPHER (Go Mascot)",
+				desc:  "Starts with Energy Chip",
+				desc2: "Capacity: 5 Slots",
+				col:   color.RGBA{52, 152, 219, 255}, // Cyan
+			},
+			{
+				name:  "RUST (Rust Mascot)",
+				desc:  "Starts with Blue Key",
+				desc2: "Capacity: 6 Slots (Extra space)",
+				col:   color.RGBA{211, 84, 0, 255}, // Orange
+			},
+		}
+
+		for i, char := range rows {
+			btnY := float32(100 + i*90)
+			btnW, btnH := float32(260), float32(70)
+			btnX := float32(30)
+
+			// เติมสีพื้นและเส้นกรอบเรืองแสงตามสถานะเลือก
+			if i == g.charSelectionRow {
+				vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{char.col.R, char.col.G, char.col.B, 40}, false)
+				vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 2.0, char.col, false)
+			} else {
+				vector.DrawFilledRect(screen, btnX, btnY, btnW, btnH, color.RGBA{20, 20, 25, 200}, false)
+				vector.StrokeRect(screen, btnX, btnY, btnW, btnH, 1.0, color.RGBA{50, 50, 55, 255}, false)
+			}
+
+			// พิมพ์ข้อความชื่อและสถิติ
+			ebitenutil.DebugPrintAt(screen, "Character: "+char.name, int(btnX)+10, int(btnY)+10)
+			ebitenutil.DebugPrintAt(screen, char.desc, int(btnX)+10, int(btnY)+30)
+			ebitenutil.DebugPrintAt(screen, char.desc2, int(btnX)+10, int(btnY)+48)
+		}
+
+		helpText := "[W/S] Move Selection  [Space/Enter] Confirm"
+		helpX := float32(160 - (len(helpText)*6)/2)
+		ebitenutil.DebugPrintAt(screen, helpText, int(helpX), 300)
+		return
+	}
+
 	if g.victory {
 		screen.Fill(color.RGBA{15, 10, 20, 255})
 
@@ -587,10 +691,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen, 0, hudY, hudWidth, hudHeight, color.RGBA{15, 15, 18, 255}, false)
 	vector.StrokeLine(screen, 0, hudY, hudWidth, hudY, 2, color.RGBA{52, 73, 94, 255}, false)
 
-	slotSize := float32(32)
+	slotSize := float32(28)
 	slotY := hudY + (hudHeight-slotSize)/2
-	for i := 0; i < 5; i++ {
-		slotX := float32(16 + i*(int(slotSize)+8))
+	for i := 0; i < g.player.MaxInventory; i++ {
+		slotX := float32(8 + i*34)
 		vector.DrawFilledRect(screen, slotX, slotY, slotSize, slotSize, color.RGBA{25, 25, 30, 255}, false)
 
 		if i == g.selectedSlot {
@@ -957,10 +1061,10 @@ func (g *Game) drawBoxUI(screen *ebiten.Image) {
 	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("STORAGE ITEM BOX (LVL %d)", g.currentLevelID), 75, 26)
 	vector.StrokeLine(screen, 160, 42, 160, 275, 1.5, color.RGBA{52, 73, 94, 255}, false)
 
-	// Left Column: Player Inventory (5 slots)
-	ebitenutil.DebugPrintAt(screen, "PLAYER (5)", 45, 45)
+	// Left Column: Player Inventory (MaxInventory slots)
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("PLAYER (%d)", g.player.MaxInventory), 45, 45)
 	playerInv := g.player.Inventory
-	for i := 0; i < 5; i++ {
+	for i := 0; i < g.player.MaxInventory; i++ {
 		slotY := float32(65 + i*40)
 		slotX := float32(20)
 		slotW := float32(130)

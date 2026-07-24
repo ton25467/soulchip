@@ -31,8 +31,11 @@ type Player struct {
 	climbTicks     int
 	climbDirection int
 
-	Inventory []ItemType
-	sprite    *ebiten.Image
+	// ข้อมูลคุณลักษณะตัวละครหลัก
+	CharType     int // 0: Gopher, 1: Rust
+	MaxInventory int // Gopher=5, Rust=6
+	Inventory    []ItemType
+	sprite       *ebiten.Image
 }
 
 func (p *Player) SetInput(dx, dy int) {
@@ -58,6 +61,8 @@ func NewPlayer(startX, startY int) *Player {
 		isClimbing:     false,
 		climbTicks:     0,
 		climbDirection: 0,
+		CharType:       0, // Default to Gopher
+		MaxInventory:   5, // Default to 5 slots
 		Inventory:      make([]ItemType, 0),
 		sprite:         sprite,
 	}
@@ -84,18 +89,22 @@ func (p *Player) Update(level *Level) {
 			p.isMoving = false
 			p.moveTicks = 0
 
-			// 1. ปราบมินิบอสลับเมื่อก้าวขยับทับตำแหน่ง
+			// 1. ปราบมินิบอสลับเมื่อก้าวขยับทับตำแหน่ง (ถ้ากระเป๋ายังมีพื้นที่เก็บกะโหลก)
 			if level.Tiles[p.GridY][p.GridX] == TileSecretBoss {
-				level.Tiles[p.GridY][p.GridX] = TileEmpty
-				p.Inventory = append(p.Inventory, ItemBossSkull)
+				if len(p.Inventory) < p.MaxInventory {
+					level.Tiles[p.GridY][p.GridX] = TileEmpty
+					p.Inventory = append(p.Inventory, ItemBossSkull)
+				}
 			}
 
-			// 2. เก็บสะสมไอเทมคีย์และชิปในด่าน
+			// 2. เก็บสะสมไอเทมคีย์และชิปในด่าน (เฉพาะกรณีที่เป้ยังมีพื้นที่ว่าง)
 			for i := 0; i < len(level.Items); i++ {
 				item := &level.Items[i]
 				if !item.Collected && item.GridX == p.GridX && item.GridY == p.GridY {
-					item.Collected = true
-					p.Inventory = append(p.Inventory, item.Type)
+					if len(p.Inventory) < p.MaxInventory {
+						item.Collected = true
+						p.Inventory = append(p.Inventory, item.Type)
+					}
 				}
 			}
 		}
@@ -305,9 +314,18 @@ func (p *Player) Draw(screen *ebiten.Image, camX, camY, camZ float64) {
 		offsetY := -targetH + 4*fScale
 		op.GeoM.Translate(float64(projX)+offsetX, float64(projY)+offsetY)
 
+		// ถ้าเป็นตัวละคร Rust ให้ทำการย้อมสไปรต์ Gopher เป็นสีส้มสนิม (Rust Orange)
+		if p.CharType == 1 {
+			op.ColorM.Scale(1.2, 0.4, 0.1, 1.0)
+		}
+
 		screen.DrawImage(p.sprite, op)
 	} else {
+		colorObj := color.RGBA{52, 152, 219, 255} // Gopher Cyan
+		if p.CharType == 1 {
+			colorObj = color.RGBA{211, 84, 0, 255} // Rust Orange
+		}
 		vector.DrawFilledCircle(screen, projX, projY, 4*float32(fScale), color.RGBA{0, 0, 0, 100}, false)
-		vector.DrawFilledCircle(screen, projX, projY-6*float32(fScale), 5*float32(fScale), color.RGBA{230, 126, 34, 255}, false)
+		vector.DrawFilledCircle(screen, projX, projY-6*float32(fScale), 5*float32(fScale), colorObj, false)
 	}
 }

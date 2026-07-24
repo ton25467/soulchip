@@ -510,3 +510,43 @@ func TestDiagonalSlidingCollision(t *testing.T) {
 	}
 }
 
+// TestCharacterSelection ทดสอบการเลือกตัวละครและความต่างของคุณสมบัติ
+func TestCharacterSelection(t *testing.T) {
+	g := &Game{
+		player:            NewPlayer(1, 1),
+		characterSelected: false,
+	}
+
+	if g.characterSelected {
+		t.Error("Game should start with characterSelected as false")
+	}
+
+	// 1. เลือกเล่นเป็น Gopher (charType = 0)
+	g.selectCharacter(0)
+	if !g.characterSelected {
+		t.Error("Expected characterSelected to be true after selection")
+	}
+	if g.player.CharType != 0 {
+		t.Errorf("Expected character type 0 (Gopher), got %d", g.player.CharType)
+	}
+	if g.player.MaxInventory != 5 {
+		t.Errorf("Expected Gopher inventory capacity to be 5, got %d", g.player.MaxInventory)
+	}
+	if len(g.player.Inventory) != 1 || g.player.Inventory[0] != ItemEnergyChip {
+		t.Errorf("Expected Gopher to start with Energy Chip, got: %v", g.player.Inventory)
+	}
+
+	// 2. เลือกเล่นเป็น Rust (charType = 1)
+	g.selectCharacter(1)
+	if g.player.CharType != 1 {
+		t.Errorf("Expected character type 1 (Rust), got %d", g.player.CharType)
+	}
+	if g.player.MaxInventory != 6 {
+		t.Errorf("Expected Rust inventory capacity to be 6, got %d", g.player.MaxInventory)
+	}
+	if len(g.player.Inventory) != 1 || g.player.Inventory[0] != ItemBlueKey {
+		t.Errorf("Expected Rust to start with Blue Key, got: %v", g.player.Inventory)
+	}
+}
+
+
